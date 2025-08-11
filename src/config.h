@@ -8,8 +8,8 @@
 #define DEVICE_NAME "ENV"
 
 
-#define I2C_SDA_PIN 21  // Define your custom SDA pin
-#define I2C_SCL_PIN 25
+#define I2C_SDA_PIN 25  // Define your custom SDA pin
+#define I2C_SCL_PIN 21
 #define PIN 27
 #define BUTTON 39
 #define MOSFET_PIN1 22
