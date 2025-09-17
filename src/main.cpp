@@ -176,7 +176,6 @@ void aqiRead(TvocSensorData tvocData)
 
 void loop()
 {
-  automata.loop();
 
   sensors_event_t humidity, temp;
   float lux = lightMeter.readLightLevel();
