@@ -89,4 +89,5 @@ const char* getCO2Status(uint16_t ppm);
 const char* getCH2OStatus(uint16_t ppb);
 
 const char* getTVOCStatus(float ppm) ;
+String getOverallQuality(const char* co2Status, const char* ch2oStatus, const char* tvocStatus);
 #endif
