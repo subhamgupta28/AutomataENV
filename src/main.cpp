@@ -1,5 +1,6 @@
 
 #include "Automata.h"
+#include "Arduino.h"
 #include "ArduinoJson.h"
 #include <Wire.h>
 #include <SoftwareSerial.h>
@@ -10,14 +11,14 @@
 #include "tvoc_sensor.h"
 #include <BH1750.h>
 
-// const char *HOST = "192.168.1.35";
-// int PORT = 8010;
+const char *HOST = "automata.realsubhamgupta.in";
+int PORT = 443;
 
-const char *HOST = "raspberry.local";
-int PORT = 8010;
+// const char *HOST = "raspberry.local";
+// int PORT = 8010;
 #define MPM10_I2C_ADDR 0x4D
 BH1750 lightMeter;
-Automata automata("ENV", HOST, PORT);
+Automata automata("ENV", HOST, PORT,"0.tcp.in.ngrok.io", 14730);
 JsonDocument doc;
 Adafruit_AHTX0 aht;
 
@@ -29,9 +30,15 @@ int iaqScore = 0;
 String aqiStatus;
 bool power = true;
 long start = millis();
-
+bool displayOnOff = true;
 void action(const Action action)
 {
+  if (action.data.containsKey("displayOnOff"))
+  {
+    displayOnOff = action.data["displayOnOff"];
+  }else{
+
+  }
   led.setPixelColor(0, 250, 250, 250);
   led.show();
 
@@ -80,8 +87,10 @@ String airQuality(float pm25)
 
 void setup()
 {
+
   delay(500);
   led.begin();
+    Serial.begin(115200);
   led.setBrightness(25);
   led.setPixelColor(0, 180, 250, 50);
   led.show();
@@ -119,7 +128,7 @@ void setup()
   automata.addAttribute("pm25", "PM 2.5", "µg/m³", "DATA|MAIN");
   automata.addAttribute("pm10", "PM 10", "µg/m³", "DATA|AUX");
   automata.addAttribute("aqi", "AQI", "", "DATA|MAIN");
-    automata.addAttribute("quality", "GAS Status", "", "DATA|MAIN");
+  automata.addAttribute("quality", "GAS Status", "", "DATA|MAIN");
   automata.addAttribute("aqiStatus", "AQI Status", "", "DATA|MAIN");
 
   automata.addAttribute("pm03count", "PM 3.0", "pcs/0.1L", "DATA|AUX");
@@ -132,6 +141,7 @@ void setup()
   // automata.addAttribute("pwm2", "PWM 2", "", "DATA|SLIDER", doc);
   // automata.addAttribute("pwm3", "PWM 3", "", "DATA|SLIDER", doc);
   automata.addAttribute("button", "Button", "On/Off", "ACTION|MENU|BTN");
+  automata.addAttribute("displayOnOff", "Display Power", "W", "ACTION|MENU|SWITCH");
   automata.registerDevice();
   automata.onActionReceived(action);
   automata.delayedUpdate(sendData);
@@ -292,7 +302,7 @@ void loop()
   doc["pm25count"] = pm25count;
   doc["pm50count"] = pm50count;
   doc["pm100count"] = pm100count;
-
+  doc["displayOnOff"] = displayOnOff;
   if (tvocData.valid)
   {
     doc["tvoc"] = String(tvocData.tvoc, 3);
@@ -310,24 +320,32 @@ void loop()
         tvocData.ch2o,
         humidity.relative_humidity);
   }
-  if (aqiValue <= 50)
-    led.setPixelColor(0, 0, 255, 0); // Green
-  else if (aqiValue <= 100)
-    led.setPixelColor(0, 120, 255, 0); // Yellow
-  else if (aqiValue <= 150)
-    led.setPixelColor(0, 255, 120, 0); // Orange
-  else if (aqiValue <= 200)
-    led.setPixelColor(0, 255, 0, 0); // Red
-  else
-    led.setPixelColor(0, 180, 0, 255); // Purple (very bad)
-  led.show();
+
+  if (displayOnOff)
+  {
+    if (aqiValue <= 50)
+      led.setPixelColor(0, 0, 255, 0); // Green
+    else if (aqiValue <= 100)
+      led.setPixelColor(0, 120, 255, 0); // Yellow
+    else if (aqiValue <= 150)
+      led.setPixelColor(0, 255, 120, 0); // Orange
+    else if (aqiValue <= 200)
+      led.setPixelColor(0, 255, 0, 0); // Red
+    else
+      led.setPixelColor(0, 180, 0, 255); // Purple (very bad)
+    led.show();
+  }
 
   doc["button"] = digitalRead(BUTTON);
 
   if ((millis() - start) > 1000)
   {
-    led.setPixelColor(0, 50, 50, 50);
-    led.show();
+    if (displayOnOff)
+    {
+      led.setPixelColor(0, 50, 50, 50);
+      led.show();
+    }
+
     automata.sendLive(doc);
     start = millis();
   }
@@ -338,13 +356,19 @@ void loop()
     doc["button"] = digitalRead(BUTTON);
     doc["key"] = "button";
     automata.sendAction(doc);
+    if (displayOnOff)
+    {
+      led.setPixelColor(0, 250, 50, 50);
+      led.show();
+    }
 
-    led.setPixelColor(0, 250, 50, 50);
-    led.show();
     delay(200);
   }
 
   delay(100);
-  // led.setPixelColor(0, 0, 0, 0);
-  // led.show();
+  if (!displayOnOff)
+  {
+    led.setPixelColor(0, 0, 0, 0);
+    led.show();
+  }
 }
