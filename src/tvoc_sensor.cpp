@@ -169,9 +169,9 @@ TvocSensorData tvoc_get_active_device_data()
         data.alarm = digitalRead(tvoc_alm);
 
         // Print results
-        Serial.printf("CO2: %d ppm (%s)\r\n", data.co2, data.co2_status);
-        Serial.printf("CH2O: %d ppb (%s)\r\n", data.ch2o, data.ch2o_status);
-        Serial.printf("TVOC: %.3f mg/m³ (%s)\r\n", data.tvoc, data.tvoc_status);
+        // Serial.printf("CO2: %d ppm (%s)\r\n", data.co2, data.co2_status);
+        // Serial.printf("CH2O: %d ppb (%s)\r\n", data.ch2o, data.ch2o_status);
+        // Serial.printf("TVOC: %.3f mg/m³ (%s)\r\n", data.tvoc, data.tvoc_status);
       }
     }
   }

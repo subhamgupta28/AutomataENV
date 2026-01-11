@@ -10,19 +10,26 @@
 #include "config.h"
 #include "tvoc_sensor.h"
 #include <BH1750.h>
+#include "SparkFun_SCD30_Arduino_Library.h"
 
-const char *HOST = "automata.realsubhamgupta.in";
-int PORT = 443;
+// const char *HOST = "automata.realsubhamgupta.in";
+// int PORT = 443;
 
-// const char *HOST = "raspberry.local";
-// int PORT = 8010;
+const char *HOST = "raspberry.local";
+int PORT = 8010;
 #define MPM10_I2C_ADDR 0x4D
 BH1750 lightMeter;
-Automata automata("ENV", HOST, PORT,"0.tcp.in.ngrok.io", 14730);
+Automata automata("ENV", "SENSOR|ENV", HOST, PORT, HOST, 1883);
 JsonDocument doc;
 Adafruit_AHTX0 aht;
 
 Adafruit_NeoPixel led(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ800);
+// Click here to get the library: http://librarymanager/All#SparkFun_SCD30
+SCD30 airSensor;
+
+float s_temp = 0;
+float s_humid = 0;
+int s_co2 = 0;
 
 float temp = 0;
 float pressure = 0;
@@ -36,8 +43,9 @@ void action(const Action action)
   if (action.data.containsKey("displayOnOff"))
   {
     displayOnOff = action.data["displayOnOff"];
-  }else{
-
+  }
+  else
+  {
   }
   led.setPixelColor(0, 250, 250, 250);
   led.show();
@@ -85,19 +93,88 @@ String airQuality(float pm25)
     return "Hazardous 🔥";
 }
 
+void init_co2()
+{
+  if (airSensor.begin(Wire, true) == false)
+  {
+    Serial.println("Air sensor not detected. Please check wiring. Freezing...");
+  }
+
+  uint16_t settingVal; // The settings will be returned in settingVal
+
+  if (airSensor.getForcedRecalibration(&settingVal) == true) // Get the setting
+  {
+    Serial.print("Forced recalibration factor (ppm) is ");
+    Serial.println(settingVal);
+  }
+  else
+  {
+    Serial.print("getForcedRecalibration failed! Freezing...");
+  }
+
+  if (airSensor.getMeasurementInterval(&settingVal) == true) // Get the setting
+  {
+    Serial.print("Measurement interval (s) is ");
+    Serial.println(settingVal);
+    // airSensor.setMeasurementInterval(1);
+  }
+  else
+  {
+    Serial.print("getMeasurementInterval failed! Freezing...");
+  }
+
+  if (airSensor.getTemperatureOffset(&settingVal) == true) // Get the setting
+  {
+    Serial.print("Temperature offset (C) is ");
+    Serial.println(((float)settingVal) / 100.0, 2);
+  }
+  else
+  {
+    Serial.print("getTemperatureOffset failed! Freezing...");
+  }
+
+  if (airSensor.getAltitudeCompensation(&settingVal) == true) // Get the setting
+  {
+    Serial.print("Altitude offset (m) is ");
+    Serial.println(settingVal);
+  }
+  else
+  {
+    Serial.print("getAltitudeCompensation failed! Freezing...");
+  }
+
+  if (airSensor.getFirmwareVersion(&settingVal) == true) // Get the setting
+  {
+    Serial.print("Firmware version is 0x");
+    Serial.println(settingVal, HEX);
+  }
+  else
+  {
+    Serial.print("getFirmwareVersion! Freezing...");
+  }
+
+  Serial.print("Auto calibration set to ");
+  if (airSensor.getAutoSelfCalibration() == true)
+    Serial.println("true");
+  else
+    Serial.println("false");
+
+  airSensor.setAutoSelfCalibration(true);
+}
+
 void setup()
 {
 
   delay(500);
   led.begin();
-    Serial.begin(115200);
+  Serial.begin(115200);
   led.setBrightness(25);
-  led.setPixelColor(0, 180, 250, 50);
+  delay(300);
+  led.setPixelColor(0, 250, 250, 250);
   led.show();
   delay(300);
-  led.setPixelColor(0, 0, 0, 250);
+  led.setPixelColor(0, 0, 0, 0);
   led.show();
-  delay(300);
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 
   pinMode(PIN, OUTPUT);
@@ -107,29 +184,53 @@ void setup()
   {
     Serial.println("Found AHT20");
   }
+  led.setPixelColor(0, 250, 250, 250);
+  led.show();
+  delay(300);
+  led.setPixelColor(0, 0, 0, 0);
+  led.show();
+  init_co2();
+  led.setPixelColor(0, 250, 250, 250);
+  led.show();
+  delay(300);
+  led.setPixelColor(0, 0, 0, 0);
+  led.show();
   tvoc_init();                   // Initialize TVOC sensor
   tvoc_set_device_active_mode(); // Set it to active mode
   automata.begin();
-
+  led.setPixelColor(0, 250, 250, 250);
+  led.show();
+  delay(300);
+  led.setPixelColor(0, 0, 0, 0);
+  led.show();
   JsonDocument doc;
   doc["max"] = 100;
   doc["min"] = 0;
-  automata.addAttribute("temp", "Temp", "C", "DATA|MAIN");
-  automata.addAttribute("humid", "Humidity", "%", "DATA|MAIN", doc);
+
+  automata.addAttribute("s_co2", "CO2", "ppm", "DATA|MAIN");
+  automata.addAttribute("co2", "E-CO2", "ppm", "DATA|MAIN");
+
+  automata.addAttribute("s_temp", "Temp 1", "C", "DATA|MAIN");
+  automata.addAttribute("temp", "Temp 2", "C", "DATA|MAIN");
+
+  automata.addAttribute("s_humid", "Humidity 1", "%", "DATA|MAIN", doc);
+  automata.addAttribute("humid", "Humidity 2", "%", "DATA|MAIN", doc);
+
+  automata.addAttribute("aqi", "AQI", "", "DATA|MAIN");
+  automata.addAttribute("quality", "GAS Status", "", "DATA|MAIN");
+  automata.addAttribute("aqiStatus", "AQI Status", "", "DATA|MAIN");
+
   automata.addAttribute("lux", "Light", "lx", "DATA|MAIN");
   automata.addAttribute("tvoc", "TVOC", "mg/m³", "DATA|AUX");
-  automata.addAttribute("co2", "CO2", "ppm", "DATA|MAIN");
+
   automata.addAttribute("ch2o", "CH2O", "ppb", "DATA|AUX");
 
   automata.addAttribute("tvocStatus", "TVOC", "", "DATA|AUX");
   automata.addAttribute("co2Status", "CO2", "", "DATA|AUX");
   automata.addAttribute("ch2oStatus", "CH2O", "", "DATA|AUX");
   automata.addAttribute("pm1", "PM 1.0", "µg/m³", "DATA|AUX");
-  automata.addAttribute("pm25", "PM 2.5", "µg/m³", "DATA|MAIN");
+  automata.addAttribute("pm25", "PM 2.5", "µg/m³", "DATA|AUX");
   automata.addAttribute("pm10", "PM 10", "µg/m³", "DATA|AUX");
-  automata.addAttribute("aqi", "AQI", "", "DATA|MAIN");
-  automata.addAttribute("quality", "GAS Status", "", "DATA|MAIN");
-  automata.addAttribute("aqiStatus", "AQI Status", "", "DATA|MAIN");
 
   automata.addAttribute("pm03count", "PM 3.0", "pcs/0.1L", "DATA|AUX");
   automata.addAttribute("pm05count", "PM 2.5", "pcs/0.1L", "DATA|AUX");
@@ -145,65 +246,110 @@ void setup()
   automata.registerDevice();
   automata.onActionReceived(action);
   automata.delayedUpdate(sendData);
-  led.setPixelColor(0, 255, 0, 0);
+  led.setPixelColor(0, 255, 250, 250);
   led.show();
   delay(200);
 }
-String evaluateAirQuality(float pm1, float pm25, float pm10, float co2, float tvoc, float ch2o, float humidity)
+String evaluateAirQuality(float co2, float tvoc, float ch2o)
 {
   float score = 0.0;
 
-  // // --- PM1.0 score ---
-  // if (pm1 > 35.0)
-  //   score += 1.0;
-  // else if (pm1 > 12.0)
-  //   score += 0.5;
-
-  // // --- PM2.5 score ---
-  // if (pm25 > 35.0)
-  //   score += 1.0;
-  // else if (pm25 > 12.0)
-  //   score += 0.5;
-
-  // // --- PM10 score ---
-  // if (pm10 > 150.0)
-  //   score += 1.0;
-  // else if (pm10 > 50.0)
-  //   score += 0.5;
-
   // --- CO2 score ---
+  // Good: < 800
+  // Moderate: 800–1200
+  // Bad: > 1200
   if (co2 > 1200)
     score += 1.0;
   else if (co2 > 800)
     score += 0.5;
 
   // --- TVOC score ---
+  // Good: < 0.3 mg/m³
+  // Moderate: 0.3–0.6
+  // Bad: > 0.6
   if (tvoc > 0.6)
     score += 1.0;
   else if (tvoc > 0.3)
     score += 0.5;
 
-  // --- CH2O (formaldehyde) score ---
+  // --- Formaldehyde (CH2O) score ---
+  // Good: < 80 ppb
+  // Moderate: 80–120
+  // Bad: > 120
   if (ch2o > 120)
     score += 1.0;
   else if (ch2o > 80)
     score += 0.5;
 
-  // --- Humidity comfort range (30–60%) ---
-  if (humidity < 30.0 || humidity > 60.0)
-    score += 0.5;
-
-  // --- Determine final air quality category ---
-  if (score <= 1.0)
+  // --- Final category ---
+  if (score <= 0.5)
     return "Excellent 🌿";
-  else if (score <= 2.5)
+  else if (score <= 1.5)
     return "Moderate 🙂";
-  else if (score <= 4.0)
+  else if (score <= 2.5)
     return "Unhealthy 😷";
   else
     return "Hazardous ☠️";
 }
+void printDocTable(const JsonDocument &doc)
+{
+  JsonObjectConst obj = doc.as<JsonObjectConst>();
 
+  Serial.println();
+  Serial.println(F("┌───────────────────────────── SENSOR DATA ─────────────────────────────┐"));
+  Serial.println(F("│  PARAMETER       │      VALUE      │   UNIT       │      EXTRA        │"));
+  Serial.println(F("├──────────────────┼─────────────────┼──────────────┼───────────────────┤"));
+
+  for (JsonPairConst kv : obj)
+  {
+    String key = kv.key().c_str();
+    String value = kv.value().as<String>();
+
+    // Unit autodetection
+    String unit = "";
+    if (key.indexOf("temp") != -1)
+      unit = "°C";
+    else if (key.indexOf("humid") != -1)
+      unit = "%";
+    else if (key.indexOf("lux") != -1)
+      unit = "lx";
+    else if (key.indexOf("co2") != -1)
+      unit = "ppm";
+    else if (key.indexOf("tvoc") != -1)
+      unit = "mg/m³";
+    else if (key.startsWith("pm"))
+      unit = "µg/m³";
+
+    // Status fields
+    String extra = "";
+    if (key.endsWith("Status"))
+      extra = value;
+
+    // Format row
+    char row[200];
+    snprintf(row, sizeof(row),
+             "│ %-16s │ %-15s │ %-10s │ %-17s │",
+             key.c_str(),
+             value.c_str(),
+             unit.c_str(),
+             extra.c_str());
+
+    Serial.println(row);
+  }
+
+  Serial.println(F("└──────────────────┴─────────────────┴──────────────┴───────────────────┘"));
+  Serial.println();
+}
+
+String co2_status(float co2)
+{
+  if (co2 <= 800)
+    return "Good";
+  else if (co2 <= 1200)
+    return "Moderate";
+  else
+    return "Bad";
+}
 // --- Calculate AQI using US EPA breakpoints ---
 float calculateAQI(float pm25, float pm10)
 {
@@ -303,22 +449,30 @@ void loop()
   doc["pm50count"] = pm50count;
   doc["pm100count"] = pm100count;
   doc["displayOnOff"] = displayOnOff;
+
+  if (airSensor.dataAvailable())
+  {
+    s_co2 = airSensor.getCO2();
+    s_humid = airSensor.getHumidity();
+    s_temp = airSensor.getTemperature();
+  }
+
+  doc["s_temp"] = String(s_temp, 2);
+  doc["s_humid"] = String(s_humid, 2);
+  doc["s_co2"] = s_co2;
+  doc["co2Status"] = co2_status(s_co2);
   if (tvocData.valid)
   {
     doc["tvoc"] = String(tvocData.tvoc, 3);
     doc["tvocStatus"] = tvocData.tvoc_status;
     doc["co2"] = tvocData.co2;
-    doc["co2Status"] = tvocData.co2_status;
+
     doc["ch2o"] = tvocData.ch2o;
     doc["ch2oStatus"] = tvocData.ch2o_status;
     doc["quality"] = evaluateAirQuality(
-        pm1,
-        pm25,
-        pm10,
-        tvocData.co2,
+        s_co2,
         tvocData.tvoc,
-        tvocData.ch2o,
-        humidity.relative_humidity);
+        tvocData.ch2o);
   }
 
   if (displayOnOff)
@@ -338,7 +492,7 @@ void loop()
 
   doc["button"] = digitalRead(BUTTON);
 
-  if ((millis() - start) > 1000)
+  if ((millis() - start) > 2000)
   {
     if (displayOnOff)
     {
@@ -347,6 +501,7 @@ void loop()
     }
 
     automata.sendLive(doc);
+    // printDocTable(doc);
     start = millis();
   }
 
