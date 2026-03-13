@@ -12,11 +12,11 @@
 #include <BH1750.h>
 #include "SparkFun_SCD30_Arduino_Library.h"
 
-// const char *HOST = "automata.realsubhamgupta.in";
-// int PORT = 443;
+const char *HOST = "automata.realsubhamgupta.in";
+int PORT = 443;
 
-const char *HOST = "raspberry.local";
-int PORT = 8010;
+// const char *HOST = "raspberry.local";
+// int PORT = 8010;
 #define MPM10_I2C_ADDR 0x4D
 BH1750 lightMeter;
 Automata automata("ENV", "SENSOR|ENV", HOST, PORT, HOST, 1883);
@@ -198,6 +198,8 @@ void setup()
   tvoc_init();                   // Initialize TVOC sensor
   tvoc_set_device_active_mode(); // Set it to active mode
   automata.begin();
+  automata.useHTTPS();
+  automata.useWSS();
   led.setPixelColor(0, 250, 250, 250);
   led.show();
   delay(300);
