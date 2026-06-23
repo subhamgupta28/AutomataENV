@@ -15,11 +15,12 @@
 const char *HOST = "automata.realsubhamgupta.in";
 int PORT = 443;
 
+const char *MQTT_HOST = "mqtt.realsubhamgupta.in";
 // const char *HOST = "raspberry.local";
 // int PORT = 8010;
 #define MPM10_I2C_ADDR 0x4D
 BH1750 lightMeter;
-Automata automata("ENV", "SENSOR|ENV", HOST, PORT, HOST, 1883);
+Automata automata("ENV", "SENSOR|ENV", HOST, PORT, MQTT_HOST, PORT);
 JsonDocument doc;
 Adafruit_AHTX0 aht;
 
